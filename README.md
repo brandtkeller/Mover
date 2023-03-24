@@ -21,3 +21,12 @@ Let's see if we can't fix that by adding a middle-man between the buttons that I
 
 ## Related Resources
 https://github.com/stianeikeland/go-rpio/blob/master/examples/blinker/blinker.go
+
+## Current Thoughts
+- Creation of a few REST API endpoints - client can easily be configured.
+    - /state
+    - Get/Put
+
+- Randomized functionality through use of a go routine?
+    - create channel(s)
+    - ability to modify some global state
