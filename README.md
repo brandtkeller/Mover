@@ -18,3 +18,6 @@ Let's see if we can't fix that by adding a middle-man between the buttons that I
     - Fully automated start/stop
     - Still have override functionality above
     - Maybe enable some checking to only change if not in a meeting?
+
+## Related Resources
+https://github.com/stianeikeland/go-rpio/blob/master/examples/blinker/blinker.go
