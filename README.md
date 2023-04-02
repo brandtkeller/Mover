@@ -14,6 +14,9 @@ Let's see if we can't fix that by adding a middle-man between the buttons that I
 - Randomized periods of sitting/standing that is aligned with general health recommendations
 
 ## Future Goals
+- Current state (Up/Down) detection - distance sensor?
+- Use flags to allow customizing default settings
+- Persistent default modification
 - Synchronize with Calendar to be able to tell when I might be out-of-office and it doesn't have to move
     - Fully automated start/stop
     - Still have override functionality above
