@@ -5,8 +5,10 @@ package cmd
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -20,6 +22,7 @@ type LifeCycle struct {
 	Random         bool
 	RandomUpTime   int
 	RandomDownTime int
+	Channel        chan int
 }
 
 type State struct {
@@ -40,6 +43,7 @@ var globalState = State{
 		Random:         false,
 		RandomUpTime:   10,
 		RandomDownTime: 30,
+		Channel:        make(chan int),
 	},
 }
 
@@ -132,6 +136,42 @@ func changeStatus(direction string) {
 	globalState.Status = direction
 }
 
+func toggleStatus() string {
+	if globalState.Status == "up" {
+		return "down"
+	} else {
+		return "up"
+	}
+}
+
+func returnTime() <-chan time.Time {
+	if globalState.Cycle.Random {
+		if globalState.Status == "up" {
+			min := 5
+			max := 15
+			// set seed
+			rand.Seed(time.Now().UnixNano())
+			// generate random number
+			globalState.Cycle.RandomUpTime = rand.Intn(max-min) + min
+			return time.After(time.Duration(time.Duration(globalState.Cycle.RandomUpTime).Minutes()))
+		} else {
+			min := 20
+			max := 35
+			// set seed
+			rand.Seed(time.Now().UnixNano())
+			// generate random number
+			globalState.Cycle.RandomDownTime = rand.Intn(max-min) + min
+			return time.After(time.Duration(time.Duration(globalState.Cycle.RandomDownTime).Minutes()))
+		}
+	} else {
+		if globalState.Status == "up" {
+			return time.After(time.Duration(time.Duration(globalState.Cycle.UpTime).Minutes()))
+		} else {
+			return time.After(time.Duration(time.Duration(globalState.Cycle.DownTime).Minutes()))
+		}
+	}
+}
+
 func changeLifecycle(newLC LifeCycle) {
 
 	if globalState.Cycle.Operating {
@@ -139,14 +179,13 @@ func changeLifecycle(newLC LifeCycle) {
 		fmt.Println("Currently in operation")
 		if !newLC.Operating {
 			fmt.Println("Shutting down routine")
-			// TODO: shut down the goroutine via channel?
-
+			globalState.Cycle.Channel <- 0
 			globalState.Cycle.Operating = false
 		}
 	} else {
 		if newLC.Operating {
 			fmt.Println("Starting a new routine")
-			// TODO: Need to start new routine
+			go lifecycle(globalState.Cycle.Channel)
 			globalState.Cycle.Operating = true
 		} else {
 			// routine already running - do we need to do anything?
@@ -154,6 +193,7 @@ func changeLifecycle(newLC LifeCycle) {
 		}
 	}
 
+	// TODO: need to send some message or track some state for this transition
 	if newLC.Random && !globalState.Cycle.Random {
 		fmt.Println("Transitioning to Random lifecycle")
 		globalState.Cycle.Random = true
@@ -164,7 +204,22 @@ func changeLifecycle(newLC LifeCycle) {
 
 }
 
-func lifecycle() {
+func lifecycle(quit chan int) {
 	// This will be the continuous loop for automating up/down intervals
+	change := returnTime()
+
+	for {
+		select {
+		case <-quit:
+			fmt.Println("quitting goroutine for automatic movement")
+			return
+		case <-change:
+			fmt.Println("Changing state")
+			changeStatus(toggleStatus())
+			change = returnTime()
+		default:
+			time.Sleep(10 * time.Second)
+		}
+	}
 
 }
