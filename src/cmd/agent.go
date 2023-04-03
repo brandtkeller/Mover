@@ -22,7 +22,6 @@ type LifeCycle struct {
 	Random         bool
 	RandomUpTime   int
 	RandomDownTime int
-	Channel        chan int
 }
 
 type State struct {
@@ -37,15 +36,17 @@ var globalState = State{
 	Status: "down",
 	Cycle: LifeCycle{
 		Operating:      false,
-		UpTime:         10,
-		DownTime:       30,
+		UpTime:         1,
+		DownTime:       1,
 		Timeout:        480,
 		Random:         false,
 		RandomUpTime:   10,
 		RandomDownTime: 30,
-		Channel:        make(chan int),
 	},
 }
+
+var globalChannelChange = make(chan int)
+var globalChannelUpdate = make(chan int)
 
 // agentCmd represents the agent command
 var agentCmd = &cobra.Command{
@@ -96,6 +97,9 @@ func putStatus(c *gin.Context) {
 	}
 	newDirection := strings.ToLower(newState.Status)
 	if newDirection == "down" || newDirection == "up" {
+		if globalState.Cycle.Operating {
+			globalChannelUpdate <- 0
+		}
 		changeStatus(newDirection)
 	} else {
 		fmt.Println("Invalid state change request - only 'up' and 'down' permitted")
@@ -153,7 +157,8 @@ func returnTime() <-chan time.Time {
 			rand.Seed(time.Now().UnixNano())
 			// generate random number
 			globalState.Cycle.RandomUpTime = rand.Intn(max-min) + min
-			return time.After(time.Duration(time.Duration(globalState.Cycle.RandomUpTime).Minutes()))
+			seconds := globalState.Cycle.RandomUpTime * 60
+			return time.After(time.Duration(seconds) * time.Second)
 		} else {
 			min := 20
 			max := 35
@@ -161,13 +166,16 @@ func returnTime() <-chan time.Time {
 			rand.Seed(time.Now().UnixNano())
 			// generate random number
 			globalState.Cycle.RandomDownTime = rand.Intn(max-min) + min
-			return time.After(time.Duration(time.Duration(globalState.Cycle.RandomDownTime).Minutes()))
+			seconds := globalState.Cycle.RandomDownTime * 60
+			return time.After(time.Duration(seconds) * time.Second)
 		}
 	} else {
 		if globalState.Status == "up" {
-			return time.After(time.Duration(time.Duration(globalState.Cycle.UpTime).Minutes()))
+			seconds := globalState.Cycle.UpTime * 60
+			return time.After(time.Duration(seconds) * time.Second)
 		} else {
-			return time.After(time.Duration(time.Duration(globalState.Cycle.DownTime).Minutes()))
+			seconds := globalState.Cycle.DownTime * 60
+			return time.After(time.Duration(seconds) * time.Second)
 		}
 	}
 }
@@ -179,17 +187,14 @@ func changeLifecycle(newLC LifeCycle) {
 		fmt.Println("Currently in operation")
 		if !newLC.Operating {
 			fmt.Println("Shutting down routine")
-			globalState.Cycle.Channel <- 0
+			globalChannelChange <- 0
 			globalState.Cycle.Operating = false
 		}
 	} else {
 		if newLC.Operating {
 			fmt.Println("Starting a new routine")
-			go lifecycle(globalState.Cycle.Channel)
+			go lifecycle(globalChannelChange, globalChannelUpdate)
 			globalState.Cycle.Operating = true
-		} else {
-			// routine already running - do we need to do anything?
-			fmt.Println("Routine already running")
 		}
 	}
 
@@ -199,12 +204,19 @@ func changeLifecycle(newLC LifeCycle) {
 		globalState.Cycle.Random = true
 	}
 
-	globalState.Cycle.UpTime = newLC.UpTime
-	globalState.Cycle.DownTime = newLC.DownTime
+	// These will be zero-value if not supplied
+	if newLC.UpTime > 0 {
+		globalState.Cycle.UpTime = newLC.UpTime
+	}
+	if newLC.DownTime > 0 {
+		globalState.Cycle.DownTime = newLC.DownTime
+	}
 
 }
 
-func lifecycle(quit chan int) {
+// Timing needs a lot of help here - This can be done a lot better - look into  `chan int` more
+// TODO: check for change to status to reset times
+func lifecycle(quit, update chan int) {
 	// This will be the continuous loop for automating up/down intervals
 	change := returnTime()
 
@@ -213,11 +225,15 @@ func lifecycle(quit chan int) {
 		case <-quit:
 			fmt.Println("quitting goroutine for automatic movement")
 			return
+		case <-update:
+			fmt.Println("Update received - generating new times")
+			change = returnTime()
 		case <-change:
 			fmt.Println("Changing state")
 			changeStatus(toggleStatus())
 			change = returnTime()
 		default:
+			fmt.Printf("Sleep 5 seconds")
 			time.Sleep(10 * time.Second)
 		}
 	}
