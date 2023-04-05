@@ -27,3 +27,6 @@ https://github.com/stianeikeland/go-rpio/blob/master/examples/blinker/blinker.go
 
 ## Current Thoughts
 - Testing dry-run before raspberry pi integration
+- Need to write the client
+    - `Mover move` - toggles the position based upon current understood position
+    - `Mover move up` - move up specifically - does nothing if already up

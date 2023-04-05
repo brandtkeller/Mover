@@ -67,6 +67,8 @@ var agentCmd = &cobra.Command{
 }
 
 func init() {
+
+	// Can I place a conditional here for goos and goarch to only allow running on the correct arch?
 	rootCmd.AddCommand(agentCmd)
 
 	// Here you will define your flags and configuration settings.
@@ -233,7 +235,7 @@ func lifecycle(quit, update chan int) {
 			changeStatus(toggleStatus())
 			change = returnTime()
 		default:
-			fmt.Printf("Sleep 5 seconds")
+			fmt.Println("Sleep 10 seconds")
 			time.Sleep(10 * time.Second)
 		}
 	}
